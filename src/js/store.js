@@ -39,7 +39,7 @@ const store = new Vuex.Store({
             return state.session_id != null
         },
         show_dialog(state) {
-            return state.last_error != null && state.route.name !== "signin"
+            return state.last_error != null
         },
         $http(state) {
             return axios.create({

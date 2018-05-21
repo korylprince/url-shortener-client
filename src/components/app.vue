@@ -57,7 +57,11 @@ export default {
             "username": "username",
             "error": "last_error"
         }),
-        ...mapGetters(["signed_in", "show_dialog", "current_feedback"])
+        ...mapGetters(["signed_in", "current_feedback"]),
+        ...mapGetters({"show_dialog_state": "show_dialog"}),
+        show_dialog() {
+            return this.$route.name !== "signin" && this.show_dialog_state
+        }
     },
     methods: {
         signout() {
