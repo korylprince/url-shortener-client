@@ -7,7 +7,7 @@ import FaviconsWebpackPlugin from "favicons-webpack-plugin"
 
 var root = path.resolve(__dirname, "../")
 
-var API_BASE = process.env.API_BASE ? process.env.API_BASE : "/api/1.0"
+var API_BASE = process.env.API_BASE ? process.env.API_BASE : "/api/1.1"
 
 export default {
     entry: {
