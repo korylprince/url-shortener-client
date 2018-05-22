@@ -74,7 +74,7 @@ export default {
                 this.$router.push(next)
                 this.$store.commit("UPDATE_NEXT_ROUTE", null)
             }).catch(() => {
-                // ignore other errors
+                // ignore errors
             })
         }
     },

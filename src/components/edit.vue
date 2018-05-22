@@ -19,38 +19,56 @@
                 <div class="md-subtitle">Views: {{current_url.views}}</div>
             </div>
 
-            <md-field :class="{'md-invalid': errors.has('url')}">
+            <md-field :class="{'md-invalid': errors.has('URL')}">
                 <label>URL</label>
-                <md-input ref="url" v-model="url" name="url" v-validate="'required|url:true'"></md-input>
-                <span class="md-error">{{errors.first('url')}}</span>
+                <md-input ref="url" v-model="url" name="url" data-vv-name="URL" v-validate="'required|url:true'"></md-input>
+                <span class="md-error">{{errors.first('URL')}}</span>
             </md-field>
 
-            <md-button @click="enable_expires" v-if="!expires">Enable Expiration Date</md-button>
+            <div v-if="create"><span>
+                    <md-switch v-model="set_id" class="md-primary">Custom Code</md-switch>
+                    <md-tooltip md-direction="bottom">Turn on to set your own code for the shortened URL</md-tooltip>
+            </span></div>
 
-            <md-field v-if="expires">
+            <md-field :class="{'md-invalid': errors.has('Custom Code')}" v-if="set_id && create">
+                <label>Custom Code</label>
+                <span class="md-prefix">{{window.location.origin}}/</span>
+                <md-input ref="custom_url_id" v-model="$data._custom_url_id" name="custom_url_id" data-vv-name="Custom Code" v-validate="custom_url_id_regex"></md-input>
+                <span class="md-error" v-if="errors.first('Custom Code')">
+                    {{errors.first('Custom Code')}}
+                    Valid characters: a-z A-Z 0-9 _ - .
+                </span>
+            </md-field>
+
+            <div><span>
+                    <md-switch v-model="set_expires" class="md-primary" @change="change_expires">Expiration Date</md-switch>
+                    <md-tooltip md-direction="bottom">Turn on to set an expiration date</md-tooltip>
+            </span></div>
+
+            <md-field v-show="expires && set_expires">
                 <label>Expires end of:</label>
                 <md-input
                     :value="expires_date"
                     name="url"
-                    disabled
-                    @click.native="enable_expires">
+                    disabled>
                 </md-input>
             </md-field>
 
-            <div style="text-align: center" v-if="expires">
+            <div style="text-align: center" v-show="expires && set_expires">
                 <v-date-picker
                     mode="single"
                     :is-inline="true"
-                    v-model="$data._expires">
+                    v-model="$data._expires"
+                    @input="unset_expires">
                 </v-date-picker>
-                <div class="md-caption">Hint: Click on selected day to clear expiration date</div>
             </div>
 
+            <div class="md-error" v-if="error">{{error}}</div>
         </md-dialog-content>
 
         <md-dialog-actions>
             <md-button class="md-accent" @click="$router.push({name: 'dashboard'})">Cancel</md-button>
-            <md-button class="md-primary" :disabled="is_loading" @click="save(url, expires)">
+            <md-button class="md-primary" :disabled="save_disabled" @click="save(custom_url_id, url, expires)">
                 <span v-show="!is_loading">Save</span>
                 <md-progress-spinner
                     class="app-spinner"
@@ -75,19 +93,35 @@ export default {
     props: ["active", "url_id"],
     data() {
         return {
+            error: null,
             url_loaded: false,
             current_url: null,
             url: null,
+            set_id: false,
+            _custom_url_id: null,
+            set_expires: false,
             _expires: null
         }
     },
     computed: {
+        window() { return window },
         ...mapGetters(["is_loading"]),
+        save_disabled() {
+            return this.is_loading || this.errors.any() || this.url == null || (this.set_id && this.custom_url_id == null)
+        },
         create() {
             return this.current_url == null
         },
+        custom_url_id() {
+            if (this.$data._custom_url_id == null || !this.$data.set_id) { return null }
+            return this.$data._custom_url_id
+        },
+        custom_url_id_regex() {
+            if (!this.set_id) { return {} }
+            return { required: true, regex: /^[a-zA-Z0-9_\-.]+$/ }
+        },
         expires() {
-            if (this.$data._expires == null) { return null }
+            if (this.$data._expires == null || !this.$data.set_expires) { return null }
             return moment(this.$data._expires).endOf("day").toDate()
         },
         expires_date() {
@@ -108,13 +142,22 @@ export default {
         }
     },
     methods: {
-        enable_expires() {
-            this.$data._expires = moment().startOf("day").add(1, "days").toDate()
+        change_expires(val) {
+            if (val && this.expires == null) {
+                this.$data._expires = moment().startOf("day").add(1, "days").toDate()
+            }
+        },
+        unset_expires(val) {
+            if (val == null) { this.set_expires = false }
         },
         load(url_id) {
             this.url_loaded = false
             this.current_url = null
             this.url = null
+            this.set_id = false
+            this.set_expires = false
+            this.$data._custom_url_id = null
+            this.set_expires = false
             this.$data._expires = null
 
             if (this.url_id == null) {
@@ -129,6 +172,7 @@ export default {
                 this.url = url.url
                 if (url.expires != null) {
                     this.$data._expires = moment(url.expires).startOf("day").toDate()
+                    this.set_expires = true
                 }
                 this.url_loaded = true
             }).catch(error => {
@@ -142,22 +186,28 @@ export default {
                 }
             })
         },
-        save(url, expires) {
+        save(url_id, url, expires) {
             if (this.is_loading) { return }
+
+            this.error = null
 
             this.$validator.validateAll().catch(() => {
                 this.$store.commit("UPDATE_ERROR", "Form validation error")
             }).then(valid => {
                 if (valid) {
                     if (this.create) {
-                        return this.$store.dispatch("put_url", {url, expires})
+                        return this.$store.dispatch("put_url", {url_id, url, expires})
                     }
-                    var url_id = this.url_id
+                    url_id = this.url_id
                     return this.$store.dispatch("update_url", {url_id, url, expires})
                 }
-                return Promise.reject()
-            }).then(() => {
-                this.$router.push({name: "dashboard"})
+                return false
+            }).then((val) => {
+                if (val !== false ) { this.$router.push({name: "dashboard"}) }
+            }).catch(error => {
+                if (error.response != null && error.response.status === 409) {
+                    this.error = "Code \"" + url_id + "\" already exists"
+                }
             })
         },
     },

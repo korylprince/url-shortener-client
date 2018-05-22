@@ -146,6 +146,9 @@ const store = new Vuex.Store({
                 } else if (error.response != null && error.response.status === 404) {
                     context.commit("ADD_FEEDBACK", "URL not found")
                     return
+                } else if (error.response != null && error.response.status === 403) {
+                    context.commit("ADD_FEEDBACK", "You don't have permission to view this URL")
+                    return
                 }
                 context.commit("UPDATE_ERROR", "Oops! Something bad happened. Contact your system administrator")
                 console.error({error: error})
@@ -153,10 +156,10 @@ const store = new Vuex.Store({
 
             return promise
         },
-        put_url(context, {url, expires}) {
+        put_url(context, {url_id, url, expires}) {
             context.commit("START_LOADING")
 
-            var promise = api.put_url(url, expires)
+            var promise = api.put_url(url_id, url, expires)
             promise.then(() => {
                 context.commit("STOP_LOADING")
                 context.commit("ADD_FEEDBACK", "URL added")
@@ -165,10 +168,13 @@ const store = new Vuex.Store({
                 if (error.response != null && error.response.status === 401) {
                     context.commit("SIGNOUT")
                     context.commit("ADD_FEEDBACK", "Session expired. Please sign back in to add URL")
-                    context.commit("UPDATE_NEXT_DISPATCH", {action: "put_url", payload: {url, expires}})
+                    context.commit("UPDATE_NEXT_DISPATCH", {action: "put_url", payload: {url_id, url, expires}})
                     return
                 } else if (error.response != null && error.response.status === 404) {
                     context.commit("ADD_FEEDBACK", "URL not found")
+                    return
+                } else if (error.response != null && error.response.status === 409) {
+                    // Handled in view
                     return
                 }
                 context.commit("UPDATE_ERROR", "Oops! Something bad happened. Contact your system administrator")

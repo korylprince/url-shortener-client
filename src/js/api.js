@@ -13,10 +13,10 @@ const api = {
         if ($http == null) { return Promise.reject({response: {status: 401}}) }
         return $http.get(API_BASE + "/urls/" + url_id)
     },
-    put_url(url, expires) {
+    put_url(url_id, url, expires) {
         var $http = store.getters.$http
         if ($http == null) { return Promise.reject({response: {status: 401}}) }
-        return $http.post(API_BASE + "/urls", {url, expires})
+        return $http.post(API_BASE + "/urls", {id: url_id, url, expires})
     },
     update_url(url_id, url, expires) {
         var $http = store.getters.$http
