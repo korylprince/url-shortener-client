@@ -8,6 +8,9 @@ This is the frontend for a URL shortening service. The backend can be found [her
 * Configurable Expiration
 * View Counter
 * Authentication
+* Random or Custom URLs
+* URL Search
+* Admin Interface
 
 # Get Started
 
