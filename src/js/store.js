@@ -14,11 +14,13 @@ const store = new Vuex.Store({
         _loading_count: 0,
         username: window.localStorage.getItem("username"),
         session_id: window.localStorage.getItem("session_id"),
+        admin: window.localStorage.getItem("admin") === "true",
         _next_route: null,
         _next_dispatch_action: null,
         _next_dispatch_payload: null,
         _feedback: [],
-        _feedback_delay: false
+        _feedback_delay: false,
+        _admin_state: false
     },
     getters: {
         is_loading(state) {
@@ -49,6 +51,13 @@ const store = new Vuex.Store({
         current_feedback(state) {
             if (state._feedback_delay || state._feedback.length === 0) { return null }
             return state._feedback[0]
+        },
+        admin_interface(state) {
+            return state.admin && state._admin_state
+        },
+        dashboard_route(state, getters) {
+            if (getters.admin_interface) { return {name: "admin"} }
+            return {name: "dashboard"}
         }
     },
     mutations: {
@@ -62,15 +71,19 @@ const store = new Vuex.Store({
         STOP_LOADING(state) {
             state._loading_count--
         },
-        UPDATE_CREDENTIALS(state, {username, session_id}) {
+        UPDATE_CREDENTIALS(state, {username, admin, session_id}) {
             state.username = username
             window.localStorage.setItem("username", username)
+            state.admin = admin
+            window.localStorage.setItem("admin", admin)
             state.session_id = session_id
             window.localStorage.setItem("session_id", session_id)
         },
         SIGNOUT(state) {
             state.username = null
             window.localStorage.removeItem("username")
+            state.admin = null
+            window.localStorage.removeItem("admin")
             state.session_id = null
             window.localStorage.removeItem("session_id")
         },
@@ -91,6 +104,9 @@ const store = new Vuex.Store({
         },
         CLEAR_FEEDBACK_DELAY(state) {
             state._feedback_delay = false
+        },
+        UPDATE_ADMIN_STATE(state, val) {
+            state._admin_state = val
         }
     },
     actions: {
@@ -100,8 +116,9 @@ const store = new Vuex.Store({
             var promise = api.authenticate(username, password)
             promise.then(response => {
                 context.commit("STOP_LOADING")
+                var admin = response.data.admin
                 var session_id = response.data.session_id
-                context.commit("UPDATE_CREDENTIALS", {username, session_id})
+                context.commit("UPDATE_CREDENTIALS", {username, admin, session_id})
             }).then(() => {
                 context.dispatch("next_dispatch")
             }).catch(error => {
@@ -240,7 +257,12 @@ const store = new Vuex.Store({
         get_urls(context) {
             context.commit("START_LOADING")
 
-            var promise = api.get_urls()
+            var promise
+            if (context.getters.admin_interface) {
+                promise = api.get_urls(true)
+            } else {
+                promise = api.get_urls(false)
+            }
             promise.then(() => {
                 context.commit("STOP_LOADING")
             }).catch(error => {

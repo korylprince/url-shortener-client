@@ -67,7 +67,7 @@
         </md-dialog-content>
 
         <md-dialog-actions>
-            <md-button class="md-accent" @click="$router.push({name: 'dashboard'})">Cancel</md-button>
+            <md-button class="md-accent" @click="$router.push(dashboard_route)">Cancel</md-button>
             <md-button class="md-primary" :disabled="save_disabled" @click="save(custom_url_id, url, expires)">
                 <span v-show="!is_loading">Save</span>
                 <md-progress-spinner
@@ -105,7 +105,7 @@ export default {
     },
     computed: {
         window() { return window },
-        ...mapGetters(["is_loading"]),
+        ...mapGetters(["is_loading", "dashboard_route"]),
         save_disabled() {
             return this.is_loading || this.errors.any() || this.url == null || (this.set_id && this.custom_url_id == null)
         },
@@ -177,11 +177,11 @@ export default {
                 this.url_loaded = true
             }).catch(error => {
                 if (error.response != null &&  error.response.status === 403) {
-                    this.$router.replace({name: "dashboard"})
+                    this.$router.replace(this.dashboard_route)
                     return
                 }
                 if (error.response != null &&  error.response.status === 404) {
-                    this.$router.push({name: "dashboard"})
+                    this.$router.push(this.dashboard_route)
                     return
                 }
             })
@@ -203,7 +203,7 @@ export default {
                 }
                 return false
             }).then((val) => {
-                if (val !== false ) { this.$router.push({name: "dashboard"}) }
+                if (val !== false ) { this.$router.push(this.dashboard_route) }
             }).catch(error => {
                 if (error.response != null && error.response.status === 409) {
                     this.error = "Code \"" + url_id + "\" already exists"

@@ -1,14 +1,49 @@
 <template>
-    <div id="dashboard">
-        <md-table v-if="urls" :value="urls" md-sort="last_modified" md-sort-order="asc" md-card>
-            <md-table-toolbar>
-                <div class="md-title">My URLs</div>
+    <div id="dashboard" :class="{'wide': admin_interface}">
+        <md-table ref="table" v-if="urls" v-model="searched_urls" md-sort="last_modified" md-sort-order="asc" md-card md-fixed-header>
+            <md-table-toolbar class="toolbar">
+                <div class="md-title" v-if="!admin_interface">My URLs</div>
+                <div class="md-title" v-if="admin_interface">All URLs</div>
+
+                <md-button class="md-icon-button" @click="reload">
+                    <md-icon v-if="!is_loading">refresh</md-icon>
+                    <md-progress-spinner
+                        class="app-spinner"
+                        v-if="is_loading"
+                        md-mode="indeterminate"
+                        :md-diameter="20"
+                        :md-stroke="2"
+                        ></md-progress-spinner>
+                </md-button>
+
+                <div class="spacer"></div>
+
+                <md-switch
+                    v-model="admin_interface_toggle"
+                    class="md-primary admin-toggle"
+                    v-if="admin">
+                    View all URLs
+                </md-switch>
+
+                <div class="spacer"></div>
+
+                <md-field md-clearable class="search md-toolbar-section-end">
+                    <md-input placeholder="Search URLs..." v-model="search" @input="search_urls" />
+                </md-field>
             </md-table-toolbar>
+
+            <md-table-empty-state
+                md-icon="search"
+                md-label="No URLs found"
+                md-description="Try another search query."
+                v-if="search">
+            </md-table-empty-state>
 
             <md-table-empty-state
                 md-icon="public"
                 md-label="No URLs Created Yet"
-                md-description="Click the button below to create your first URL!">
+                md-description="Click the button below to create your first URL!"
+                v-if="!search">
                 <md-button class="md-primary md-raised" @click="$router.push({name: 'create'})">Add URL</md-button>
             </md-table-empty-state>
 
@@ -28,6 +63,7 @@
                     {{item.last_modified | pretty_from_now}}
                     <md-tooltip md-direction="bottom">{{item.last_modified | pretty}}</md-tooltip>
                 </md-table-cell>
+                <md-table-cell md-label="User" md-sort-by="user" v-if="admin_interface">{{item.user}}</md-table-cell>
                 <md-table-cell md-label="Actions">
                     <md-button class="md-icon-button"
                         v-clipboard="window.location.origin + '/' + item.id"
@@ -56,7 +92,7 @@
             md-confirm-text="Yes"
             md-cancel-text="Cancel"
             @md-confirm="delete_url($route.params.id)" 
-            @md-cancel="$router.push({name: 'dashboard'})"
+            @md-cancel="$router.push(dashboard_route)"
             />
     </div>
 </template>
@@ -72,7 +108,7 @@ function processURLs(urls) {
 }
 
 import moment from "moment"
-import {mapGetters} from "vuex"
+import {mapState, mapGetters} from "vuex"
 import AuthorizedMixin from "./authorized-mixin.js"
 import store from "../js/store.js"
 import AppEdit from "./edit.vue"
@@ -91,16 +127,34 @@ export default {
     },
     data() {
         return {
-            urls: []
+            search: "",
+            urls: [],
+            searched_urls: []
         }
     },
     computed: {
-        ...mapGetters(["is_loading"]),
+        window() {
+            return window
+        },
+        ...mapState(["admin"]),
+        ...mapGetters(["is_loading", "admin_interface", "dashboard_route"]),
         editActive() {
             return this.$route.name === "create" || this.$route.name === "edit"
         },
-        window() {
-            return window
+        admin_interface_toggle: {
+            get() {
+                return this.admin_interface
+            },
+            set(val) {
+                this.$store.commit("UPDATE_ADMIN_STATE", val)
+            }
+        }
+    },
+    watch: {
+        $route(route) {
+            if (route.name === "admin" || route.name === "dashboard") {
+                this.reload()
+            }
         }
     },
     methods: {
@@ -110,43 +164,69 @@ export default {
                 var urls = response.data.urls
                 processURLs(urls)
                 this.urls = urls
+                this.search_urls(this.search)
+                this.$nextTick(() => { window.dispatchEvent(new Event("resize")) })
             })
+        },
+        resort_urls() {
+            if (this.$refs.table != null) { this.$refs.table.mdSortFn(this.searched_urls) }
+        },
+        search_urls(search) {
+            if (search == null) {
+                this.searched_urls = this.urls
+                this.resort_urls()
+                return
+            }
+
+            search = search.toLowerCase()
+            this.searched_urls = this.urls.filter(elem => {
+                if (elem.id.toLowerCase().includes(search)) { return true }
+                if (elem.url.toLowerCase().includes(search)) { return true }
+                if (this.admin_interface && elem.user.toLowerCase().includes(search)) { return true }
+            })
+
+            this.resort_urls()
         },
         delete_url(url_id) {
             if (this.is_loading) { return }
 
             var promise = this.$store.dispatch("delete_url", url_id)
             promise.then(() => {
-                this.$router.push({name: "dashboard"})
-                this.reload()
+                this.$router.push(this.dashboard_route)
             }).catch(error => {
                 if (error.response != null &&  error.response.status === 403) {
-                    this.$router.replace({name: "dashboard"})
+                    this.$router.replace(this.dashboard_route)
                     return
                 }
                 if (error.response != null &&  error.response.status === 404) {
-                    this.$router.push({name: "dashboard"})
+                    this.$router.push(this.dashboard_route)
                     return
                 }
             })
         }
     },
-    beforeRouteEnter(to, from, next) {
-        /* Remove once https://github.com/vuejs/vue-router/issues/2188 is resolved
-        if (to.name !== "dashboard") {
-            next()
-            return
-        }
-        */
-
+    created() {
         var promise = store.dispatch("get_urls")
         promise.then(response => {
-                var urls = response.data.urls
-            next(vm => {
-                processURLs(urls)
-                vm.urls = urls
-            })
+            var urls = response.data.urls
+            processURLs(urls)
+            this.urls = urls
+            this.search_urls(this.search)
         })
+    },
+    beforeRouteEnter(to, from, next) {
+        if (to.name === "admin" && !store.state.admin) {
+            next({name: "dashboard"})
+            return
+        }
+
+        if (to.name === "admin") {
+            store.commit("UPDATE_ADMIN_STATE", true)
+        } else if (to.name === "dashboard") {
+            store.commit("UPDATE_ADMIN_STATE", false)
+        }
+
+        next()
     }
 }
 </script>
@@ -154,6 +234,22 @@ export default {
 <style lang="stylus">
 #content #dashboard
     max-width: 960px
+
+#content #dashboard.wide
+    max-width: 1280px
+
+.md-toolbar.toolbar
+    .md-title
+        flex: none
+
+    .spacer
+        flex: 1
+
+    .admin-toggle
+        flex: 1
+
+.search
+    max-width: 300px
 
 .md-table-cell.url-cell
     max-width: 200px

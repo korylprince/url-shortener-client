@@ -28,9 +28,12 @@ const api = {
         if ($http == null) { return Promise.reject({response: {status: 401}}) }
         return $http.delete(API_BASE + "/urls/" + url_id)
     },
-    get_urls() {
+    get_urls(all_urls) {
         var $http = store.getters.$http
         if ($http == null) { return Promise.reject({response: {status: 401}}) }
+        if (all_urls) {
+            return $http.get(API_BASE + "/urls?all=true")
+        }
         return $http.get(API_BASE + "/urls")
     }
 }

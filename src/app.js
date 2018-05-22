@@ -24,6 +24,18 @@ store.watch((state, getters) => { return getters.signed_in }, signed_in => {
     }
 })
 
+// if admin_interface value changes, change route
+store.watch((state, getters) => { return getters.admin_interface }, admin_interface => {
+    if (admin_interface && router.currentRoute.name !== "admin") {
+        router.push({name: "admin"})
+        return
+    }
+    if (!admin_interface && router.currentRoute.name !== "dashboard") {
+        router.push({name: "dashboard"})
+        return
+    }
+})
+
 import MainApp from "./components/app.vue"
 
 var App = new (Vue.extend(MainApp))({

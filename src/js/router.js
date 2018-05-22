@@ -10,6 +10,7 @@ const router = new VueRouter({
     routes: [
         {name: "signin", path: "/signin", component: AppSignin},
         {name: "dashboard", path: "/dashboard", component: AppDashboard},
+        {name: "admin", path: "/admin", component: AppDashboard},
         {name: "create", path: "/create", component: AppDashboard},
         {name: "edit", path: "/edit/:id", component: AppDashboard},
         {name: "delete", path: "/delete/:id", component: AppDashboard},
