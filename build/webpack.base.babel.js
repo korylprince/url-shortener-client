@@ -8,6 +8,7 @@ import FaviconsWebpackPlugin from "favicons-webpack-plugin"
 var root = path.resolve(__dirname, "../")
 
 var API_BASE = process.env.API_BASE ? process.env.API_BASE : "/api/1.1"
+var APP_TITLE = process.env.APP_TITLE
 
 export default {
     entry: {
@@ -64,7 +65,8 @@ export default {
     },
     plugins: [
         new webpack.DefinePlugin({
-            API_BASE: JSON.stringify(API_BASE)
+            API_BASE: JSON.stringify(API_BASE),
+            APP_TITLE: JSON.stringify(APP_TITLE)
         }),
         new VueLoaderPlugin(),
         new MiniCssExtractPlugin({

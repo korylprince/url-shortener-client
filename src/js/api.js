@@ -35,6 +35,9 @@ const api = {
             return $http.get(API_BASE + "/urls?all=true")
         }
         return $http.get(API_BASE + "/urls")
+    },
+    title() {
+        return axios.get(API_BASE + "/title")
     }
 }
 

@@ -1,3 +1,5 @@
+/*global APP_TITLE*/
+
 import axios from "axios"
 
 import Vue from "vue"
@@ -20,7 +22,8 @@ const store = new Vuex.Store({
         _next_dispatch_payload: null,
         _feedback: [],
         _feedback_delay: false,
-        _admin_state: false
+        _admin_state: false,
+        title: APP_TITLE
     },
     getters: {
         is_loading(state) {
@@ -107,6 +110,10 @@ const store = new Vuex.Store({
         },
         UPDATE_ADMIN_STATE(state, val) {
             state._admin_state = val
+        },
+        UPDATE_TITLE(state, title) {
+            state.title = title
+            document.title = title
         }
     },
     actions: {
@@ -277,8 +284,28 @@ const store = new Vuex.Store({
             })
 
             return promise
+        },
+        update_title(context) {
+            if (context.state.title) { return }
+
+            context.commit("START_LOADING")
+
+            var promise = api.title()
+            promise.then(response => {
+                context.commit("STOP_LOADING")
+                var title = response.data.app_title || "URL Shortener"
+                context.commit("UPDATE_TITLE", title)
+            }).catch(error => {
+                context.commit("STOP_LOADING")
+                context.commit("UPDATE_ERROR", "Oops! Something bad happened. Contact your system administrator")
+                console.error({error: error})
+            })
+
+            return promise
         }
     }
 })
+
+store.dispatch("update_title")
 
 export default store

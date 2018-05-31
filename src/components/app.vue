@@ -2,7 +2,7 @@
     <div id="root" class="page-container">
         <md-app>
             <md-app-toolbar class="md-primary md-dense">
-                <router-link class="md-title" :to="dashboard_route">URL Shortener</router-link>
+                <router-link class="md-title" :to="dashboard_route">{{title}}</router-link>
 
                 <span v-show="username">{{username}}</span>
 
@@ -53,10 +53,8 @@ import {mapState, mapGetters} from "vuex"
 export default {
     name: "my-app",
     computed: {
-        ...mapState({
-            "username": "username",
-            "error": "last_error"
-        }),
+        ...mapState(["username", "title"]),
+        ...mapState({"error": "last_error"}),
         ...mapGetters(["signed_in", "current_feedback", "dashboard_route"]),
         ...mapGetters({"show_dialog_state": "show_dialog"}),
         show_dialog() {
