@@ -124,7 +124,7 @@ const store = new Vuex.Store({
             }).catch(error => {
                 context.commit("STOP_LOADING")
                 if (error.response !== null && error.response.status === 401) {
-                    context.commit("UPDATE_ERROR", "Wrong email or password")
+                    context.commit("UPDATE_ERROR", "Wrong username or password")
                     return
                 }
                 context.commit("UPDATE_ERROR", "Oops! Something bad happened. Contact your system administrator")
