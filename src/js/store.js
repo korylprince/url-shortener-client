@@ -1,5 +1,3 @@
-/*global APP_TITLE*/
-
 import axios from "axios"
 
 import Vue from "vue"
@@ -13,7 +11,9 @@ const store = new Vuex.Store({
     strict: process.env.NODE_ENV !== "production",
     state: {
         last_error: null,
-        _loading_count: 0,
+        _loading: {},
+        title: "URL Shortener",
+        display_name: window.localStorage.getItem("display_name"),
         username: window.localStorage.getItem("username"),
         session_id: window.localStorage.getItem("session_id"),
         admin: window.localStorage.getItem("admin") === "true",
@@ -22,12 +22,17 @@ const store = new Vuex.Store({
         _next_dispatch_payload: null,
         _feedback: [],
         _feedback_delay: false,
-        _admin_state: false,
-        title: APP_TITLE
     },
     getters: {
         is_loading(state) {
-            return state._loading_count !== 0
+            return (...keys) => {
+                for (const key of keys) {
+                    if (key in state._loading && state._loading[key] !== 0) {
+                        return true
+                    }
+                }
+                return false
+            }
         },
         next_route(state) {
             if (state._next_route == null) {
@@ -37,7 +42,7 @@ const store = new Vuex.Store({
                 name: state._next_route.name,
                 path: state._next_route.path,
                 params: state._next_route.params,
-                query: state._next_route.query
+                query: state._next_route.query,
             }
         },
         signed_in(state) {
@@ -48,47 +53,55 @@ const store = new Vuex.Store({
         },
         $http(state) {
             return axios.create({
-                headers: {Authorization: "Session id=\"" + state.session_id + "\""}
+                headers: {Authorization: "Bearer " + state.session_id},
             })
         },
         current_feedback(state) {
-            if (state._feedback_delay || state._feedback.length === 0) { return null }
+            if (state._feedback_delay || state._feedback.length === 0) {
+                return null
+            }
             return state._feedback[0]
         },
-        admin_interface(state) {
-            return state.admin && state._admin_state
-        },
-        dashboard_route(state, getters) {
-            if (getters.admin_interface) { return {name: "admin"} }
-            return {name: "dashboard"}
-        }
     },
     mutations: {
         UPDATE_ERROR(state, error) {
             state.last_error = error
         },
-        START_LOADING(state) {
-            state._loading_count++
+        START_LOADING(state, key) {
+            if (!(key in state._loading)) {
+                Vue.set(state._loading, key, 0)
+            }
+            state._loading[key]++
             state.last_error = null
         },
-        STOP_LOADING(state) {
-            state._loading_count--
+        STOP_LOADING(state, key) {
+            state._loading[key]--
         },
-        UPDATE_CREDENTIALS(state, {username, admin, session_id}) {
+        UPDATE_TITLE(state, title) {
+            if (title !== "") {
+                state.title = title
+                document.title = title
+            }
+        },
+        UPDATE_CREDENTIALS(state, {display_name, username, session_id, admin}) {
+            state.display_name = display_name
+            window.localStorage.setItem("display_name", display_name)
             state.username = username
             window.localStorage.setItem("username", username)
-            state.admin = admin
-            window.localStorage.setItem("admin", admin)
             state.session_id = session_id
             window.localStorage.setItem("session_id", session_id)
+            state.admin = admin
+            window.localStorage.setItem("admin", admin)
         },
         SIGNOUT(state) {
+            state.display_name = null
+            window.localStorage.removeItem("display_name")
             state.username = null
             window.localStorage.removeItem("username")
-            state.admin = null
-            window.localStorage.removeItem("admin")
             state.session_id = null
             window.localStorage.removeItem("session_id")
+            state.admin = null
+            window.localStorage.removeItem("admin")
         },
         UPDATE_NEXT_ROUTE(state, route) {
             state._next_route = route
@@ -98,7 +111,9 @@ const store = new Vuex.Store({
             state._next_dispatch_payload = payload
         },
         ADD_FEEDBACK(state, msg) {
-            state._feedback.push(msg)
+            if (state._feedback[state._feedback.length - 1] !== msg) {
+                state._feedback.push(msg)
+            }
         },
         CLEAR_FEEDBACK(state) {
             // remove first element
@@ -108,46 +123,43 @@ const store = new Vuex.Store({
         CLEAR_FEEDBACK_DELAY(state) {
             state._feedback_delay = false
         },
-        UPDATE_ADMIN_STATE(state, val) {
-            state._admin_state = val
-        },
-        UPDATE_TITLE(state, title) {
-            state.title = title
-            document.title = title
-        }
     },
     actions: {
-        authenticate(context, {username, password}) {
-            context.commit("START_LOADING")
+        async authenticate(context, {username, password}) {
+            context.commit("START_LOADING", api.authenticate)
 
-            var promise = api.authenticate(username, password)
-            promise.then(response => {
-                context.commit("STOP_LOADING")
-                var admin = response.data.admin
-                var session_id = response.data.session_id
-                context.commit("UPDATE_CREDENTIALS", {username, admin, session_id})
-            }).then(() => {
-                context.dispatch("next_dispatch")
-            }).catch(error => {
-                context.commit("STOP_LOADING")
-                if (error.response !== null && error.response.status === 401) {
+            try {
+                const response = await api.authenticate(username, password)
+                context.commit("STOP_LOADING", api.authenticate)
+                context.commit("UPDATE_CREDENTIALS", {display_name: response.data.display_name, username, session_id: response.data.session_id, admin: response.data.attrs.admin})
+            } catch (err) {
+                context.commit("STOP_LOADING", api.authenticate)
+                if (err.response !== null && err.response.status === 401) {
                     context.commit("UPDATE_ERROR", "Wrong username or password")
                     return
                 }
                 context.commit("UPDATE_ERROR", "Oops! Something bad happened. Contact your system administrator")
-                console.error({error: error})
-            })
-
-            return promise
+                console.error({error: err})
+                return
+            }
         },
-        signout(context) {
+        async signout(context) {
             context.commit("SIGNOUT")
         },
-        next_dispatch(context) {
-            if (context.state._next_dispatch_action == null) { return }
-            return context.dispatch(context.state._next_dispatch_action, context.state._next_dispatch_payload).finally(() => {
-                context.commit("UPDATE_NEXT_DISPATCH", {action: null, payload: null})
-            })
+        next_route(context, router) {
+            let next = context.getters.next_route
+            if (next == null) {
+                next = {name: "dashboard"}
+            }
+            router.push(next)
+            context.commit("UPDATE_NEXT_ROUTE", null)
+        },
+        async next_dispatch(context) {
+            if (context.state._next_dispatch_action == null) {
+                return
+            }
+            await context.dispatch(context.state._next_dispatch_action, context.state._next_dispatch_payload)
+            context.commit("UPDATE_NEXT_DISPATCH", {action: null, payload: null})
         },
         clear_feedback(context) {
             context.commit("CLEAR_FEEDBACK")
@@ -155,157 +167,28 @@ const store = new Vuex.Store({
                 context.commit("CLEAR_FEEDBACK_DELAY")
             }, 500)
         },
-        get_url(context, url_id) {
-            context.commit("START_LOADING")
-
-            var promise = api.get_url(url_id)
-            promise.then(() => {
-                context.commit("STOP_LOADING")
-            }).catch(error => {
-                context.commit("STOP_LOADING")
-                if (error.response != null && error.response.status === 401) {
-                    context.commit("SIGNOUT")
+        async api_action(context, {action, params}) {
+            context.commit("START_LOADING", action)
+            try {
+                const response = await action(...params)
+                context.commit("STOP_LOADING", action)
+                return response.data
+            } catch (err) {
+                context.commit("STOP_LOADING", action)
+                if (err.response !== null && err.response.status === 401) {
+                    context.dispatch("signout")
                     context.commit("ADD_FEEDBACK", "Session expired. Please sign back in")
-                    return
-                } else if (error.response != null && error.response.status === 404) {
-                    context.commit("ADD_FEEDBACK", "URL not found")
-                    return
-                } else if (error.response != null && error.response.status === 403) {
-                    context.commit("ADD_FEEDBACK", "You don't have permission to view this URL")
-                    return
+                } else if (err.response !== null && (err.response.status === 404 || err.response.status === 409)) {
+                    // pass
+                } else {
+                    context.commit("UPDATE_ERROR", "Oops! Something bad happened. Contact your system administrator")
+                    console.error({err: err})
                 }
-                context.commit("UPDATE_ERROR", "Oops! Something bad happened. Contact your system administrator")
-                console.error({error: error})
-            })
-
-            return promise
-        },
-        put_url(context, {url_id, url, expires}) {
-            context.commit("START_LOADING")
-
-            var promise = api.put_url(url_id, url, expires)
-            promise.then(() => {
-                context.commit("STOP_LOADING")
-                context.commit("ADD_FEEDBACK", "URL added")
-            }).catch(error => {
-                context.commit("STOP_LOADING")
-                if (error.response != null && error.response.status === 401) {
-                    context.commit("SIGNOUT")
-                    context.commit("ADD_FEEDBACK", "Session expired. Please sign back in to add URL")
-                    context.commit("UPDATE_NEXT_DISPATCH", {action: "put_url", payload: {url_id, url, expires}})
-                    return
-                } else if (error.response != null && error.response.status === 404) {
-                    context.commit("ADD_FEEDBACK", "URL not found")
-                    return
-                } else if (error.response != null && error.response.status === 409) {
-                    // Handled in view
-                    return
-                }
-                context.commit("UPDATE_ERROR", "Oops! Something bad happened. Contact your system administrator")
-                console.error({error: error})
-            })
-
-            return promise
-        },
-        update_url(context, {url_id, url, expires}) {
-            context.commit("START_LOADING")
-
-            var promise = api.update_url(url_id, url, expires)
-            promise.then(() => {
-                context.commit("STOP_LOADING")
-                context.commit("ADD_FEEDBACK", "URL updated")
-            }).catch(error => {
-                context.commit("STOP_LOADING")
-                if (error.response != null && error.response.status === 401) {
-                    context.commit("SIGNOUT")
-                    context.commit("ADD_FEEDBACK", "Session expired. Please sign back in to update URL")
-                    context.commit("UPDATE_NEXT_DISPATCH", {action: "update_url", payload: {url_id, url, expires}})
-                    return
-                } else if (error.response != null && error.response.status === 404) {
-                    context.commit("ADD_FEEDBACK", "URL not found")
-                    return
-                } else if (error.response != null && error.response.status === 403) {
-                    context.commit("ADD_FEEDBACK", "You don't have permission to update this URL")
-                    return
-                }
-                context.commit("UPDATE_ERROR", "Oops! Something bad happened. Contact your system administrator")
-                console.error({error: error})
-            })
-
-            return promise
-        },
-        delete_url(context, url_id) {
-            context.commit("START_LOADING")
-
-            var promise = api.delete_url(url_id)
-            promise.then(() => {
-                context.commit("STOP_LOADING")
-                context.commit("ADD_FEEDBACK", "URL deleted")
-            }).catch(error => {
-                context.commit("STOP_LOADING")
-                if (error.response != null && error.response.status === 401) {
-                    context.commit("SIGNOUT")
-                    context.commit("ADD_FEEDBACK", "Session expired. Please sign back in to delete URL")
-                    context.commit("UPDATE_NEXT_DISPATCH", {action: "delete_url", payload: url_id})
-                    return
-                } else if (error.response != null && error.response.status === 404) {
-                    context.commit("ADD_FEEDBACK", "URL not found")
-                    return
-                } else if (error.response != null && error.response.status === 403) {
-                    context.commit("ADD_FEEDBACK", "You don't have permission to delete this URL")
-                    return
-                }
-                context.commit("UPDATE_ERROR", "Oops! Something bad happened. Contact your system administrator")
-                console.error({error: error})
-            })
-
-            return promise
-        },
-        get_urls(context) {
-            context.commit("START_LOADING")
-
-            var promise
-            if (context.getters.admin_interface) {
-                promise = api.get_urls(true)
-            } else {
-                promise = api.get_urls(false)
+                // handle in caller
+                throw (err)
             }
-            promise.then(() => {
-                context.commit("STOP_LOADING")
-            }).catch(error => {
-                context.commit("STOP_LOADING")
-                if (error.response != null && error.response.status === 401) {
-                    context.commit("SIGNOUT")
-                    context.commit("ADD_FEEDBACK", "Session expired. Please sign back in")
-                    return
-                }
-                context.commit("UPDATE_ERROR", "Oops! Something bad happened. Contact your system administrator")
-                console.error({error: error})
-            })
-
-            return promise
         },
-        update_title(context) {
-            if (context.state.title) { return }
-
-            context.commit("START_LOADING")
-
-            var promise = api.title()
-            promise.then(response => {
-                context.commit("STOP_LOADING")
-                var title = response.data.app_title || "URL Shortener"
-                context.commit("UPDATE_TITLE", title)
-            }).catch(error => {
-                context.commit("STOP_LOADING")
-                context.commit("UPDATE_ERROR", "Oops! Something bad happened. Contact your system administrator")
-                console.error({error: error})
-            })
-
-            return promise
-        }
-    }
+    },
 })
-
-store.dispatch("update_title")
 
 export default store

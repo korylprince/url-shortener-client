@@ -5,11 +5,63 @@
         <title>URL Shortener</title>
         <meta name="description" content="Authenticated URL Shortener">
         <meta name="author" content="Kory Prince <korylprince@gmail.com>">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Roboto:300,400,500,700,400italic">
-        <link rel="stylesheet" href="//fonts.googleapis.com/icon?family=Material+Icons">
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+        <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900">
+        <style type="text/css">
+                @keyframes pulse-color {
+                    from {fill:#0D47A1; color: #0D47A1}
+                    to {fill: #2196F3; color: #2196F3}
+                }
+                @keyframes pulse-size {
+                    from {transform: scale(1.0);}
+                    to {transform: scale(1.01);}
+                }
+                #loading {
+                    min-width: 100%;
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background-color: #FAFAFA; 
+                }
+                #loading div {
+                    text-align: center;
+                    background-color: #FFFFFF;
+                    width: 300px;
+                    height: 300px;
+                    border-radius:150px;
+                    display: flex;
+                    flex-flow: column;
+                    align-items: center;
+                    justify-content: center;
+                    box-shadow: 0px 3px 1px -2px rgba(0, 0, 0, 0.2), 0px 2px 2px 0px rgba(0, 0, 0, 0.14), 0px 1px 5px 0px rgba(0, 0, 0, 0.12);
+                }
+                #loading svg {
+                    width: 128px;
+                    height: 128px;
+                    animation-name: pulse-color, pulse-size;
+                    animation-duration: 2s;
+                    animation-iteration-count: infinite;
+                    animation-direction: alternate;
+                }
+                #loading h1 {
+                    font-family: Roboto;
+                    margin: 0;
+                    animation-name: pulse-color;
+                    animation-duration: 2s;
+                    animation-iteration-count: infinite;
+                    animation-direction: alternate;
+                }
+        </style>
     </head>
     <body>
-        <div id="root"></div>
+        <div id="root">
+            <div id="loading">
+                <div>
+                    <svg id="mdi-printer" viewBox="0 0 24 24"><path d="M17.9,17.39C17.64,16.59 16.89,16 16,16H15V13A1,1 0 0,0 14,12H8V10H10A1,1 0 0,0 11,9V7H13A2,2 0 0,0 15,5V4.59C17.93,5.77 20,8.64 20,12C20,14.08 19.2,15.97 17.9,17.39M11,19.93C7.05,19.44 4,16.08 4,12C4,11.38 4.08,10.78 4.21,10.21L9,15V16A2,2 0 0,0 11,18M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" /></svg>
+                    <h1>Loading</h1>
+                </div>
+            </div>
+        </div>
     </body>
 </html>

@@ -1,260 +1,245 @@
 <template>
-    <div id="dashboard" :class="{'wide': admin_interface}">
-        <md-table ref="table" v-if="urls" v-model="searched_urls" md-sort="last_modified" md-sort-order="asc" md-card md-fixed-header>
-            <md-table-toolbar class="toolbar">
-                <div class="md-title" v-if="!admin_interface">My URLs</div>
-                <div class="md-title" v-if="admin_interface">All URLs</div>
+    <v-card width="100%" :max-width="admin_mode ? '1280px': '960px'" :loading="_loading">
+        <v-card-title>
+            <span v-if="admin_mode">All URLs</span>
+            <span v-else>My URLs</span>
 
-                <md-button class="md-icon-button" @click="reload">
-                    <md-icon v-if="!is_loading">refresh</md-icon>
-                    <md-progress-spinner
-                        class="app-spinner"
-                        v-if="is_loading"
-                        md-mode="indeterminate"
-                        :md-diameter="20"
-                        :md-stroke="2"
-                        ></md-progress-spinner>
-                </md-button>
+            <v-progress-circular indeterminate class="ma-2" :size="20" :width="2" v-if="_loading"></v-progress-circular>
 
-                <div class="spacer"></div>
+            <v-btn icon v-else @click="get_urls(admin_mode)">
+                <v-icon>mdi-reload</v-icon>
+            </v-btn>
 
-                <md-switch
-                    v-model="admin_interface_toggle"
-                    class="md-primary admin-toggle"
-                    v-if="admin">
-                    View all URLs
-                </md-switch>
+            <v-spacer></v-spacer>
 
-                <div class="spacer"></div>
+            <v-switch v-model="admin_mode" label="View all URLs" v-if="admin"></v-switch>
 
-                <md-field md-clearable class="search md-toolbar-section-end">
-                    <md-input placeholder="Search URLs..." v-model="search" @input="search_urls" />
-                </md-field>
-            </md-table-toolbar>
+            <v-spacer></v-spacer>
+            <v-text-field
+                v-model="search"
+                prepend-icon="mdi-magnify"
+                label="Search URLs..."
+                single-line
+                hide-details
+                class="mt-0 pt-0"
+                ></v-text-field>
+        </v-card-title>
+        <v-data-table
+            :headers="headers"
+            :items="items"
+            :hide-default-footer="items.length === 0"
+            :search="search">
 
-            <md-table-empty-state
-                md-icon="search"
-                md-label="No URLs found"
-                md-description="Try another search query."
-                v-if="search">
-            </md-table-empty-state>
+            <template slot="no-data">
+                <div class="ma-5">
+                    <v-icon :size="200">mdi-earth</v-icon>
+                    <div class="display-2" style="color: black">No URLs Created Yet</div>
+                    <div class="body-1">Click the button below to create your first URL!</div>
+                    <v-btn color="primary" class="ma-5" @click="edit_dialog = true">Add URL</v-btn>
+                </div>
+            </template>
 
-            <md-table-empty-state
-                md-icon="public"
-                md-label="No URLs Created Yet"
-                md-description="Click the button below to create your first URL!"
-                v-if="!search">
-                <md-button class="md-primary md-raised" @click="$router.push({name: 'create'})">Add URL</md-button>
-            </md-table-empty-state>
+            <template v-slot:item.id="{item}">
+                <a :href="item.id | url">{{item.id}}</a>
+            </template>
 
-            <md-table-row slot="md-table-row" slot-scope="{ item }">
-                <md-table-cell md-label="ID" md-sort-by="id">
-                    <a target="_blank" :href="window.location.origin + '/' + item.id">{{item.id}}</a>
-                </md-table-cell>
-                <md-table-cell class="url-cell" md-label="URL" md-sort-by="url">
-                    <a target="_blank" :href="item.url">{{item.url}}</a>
-                </md-table-cell>
-                <md-table-cell md-label="Views" md-sort-by="views">{{item.views}}</md-table-cell>
-                <md-table-cell md-label="Expires" md-sort-by="_expires">
-                    {{item.expires | pretty_from_now}}
-                    <md-tooltip md-direction="bottom" v-if="item.expires">{{item.expires | pretty}}</md-tooltip>
-                </md-table-cell>
-                <md-table-cell md-label="Last Modified" md-sort-by="last_modified">
-                    {{item.last_modified | pretty_from_now}}
-                    <md-tooltip md-direction="bottom">{{item.last_modified | pretty}}</md-tooltip>
-                </md-table-cell>
-                <md-table-cell md-label="User" md-sort-by="user" v-if="admin_interface">{{item.user}}</md-table-cell>
-                <md-table-cell md-label="Actions">
-                    <md-button class="md-icon-button"
-                        v-clipboard="window.location.origin + '/' + item.id"
-                        @success="$store.commit('ADD_FEEDBACK', 'URL copied to clipboard')">
-                        <md-icon>file_copy</md-icon>
-                        <md-tooltip md-direction="bottom">Copy to Clipboard</md-tooltip>
-                    </md-button>
-                    <md-button class="md-icon-button" @click="$router.push({name: 'edit', params: {id: item.id}})">
-                        <md-icon>edit</md-icon>
-                        <md-tooltip md-direction="bottom">Edit</md-tooltip>
-                    </md-button>
-                    <md-button class="md-icon-button" @click="$router.push({name: 'delete', params: {id: item.id}})">
-                        <md-icon>delete</md-icon>
-                        <md-tooltip md-direction="bottom">Delete</md-tooltip>
-                    </md-button>
-                </md-table-cell>
-            </md-table-row>
-        </md-table>
+            <template v-slot:item.url="{item}">
+                <a :href="item.url" class="url-item">{{item.url}}</a>
+            </template>
 
-        <app-edit :active="editActive" :url_id="$route.params.id"/>
+            <template v-slot:item.expires="{item}">
+                <v-tooltip bottom v-if="item.expires">
+                    <template v-slot:activator="{on}">
+                        <span v-on="on">{{item.expires | pretty_from_now}}</span>
+                    </template>
+                    <span>{{item.expires | pretty}}</span>
+                </v-tooltip>
+                <span v-else>Never</span>
+            </template>
 
-        <md-dialog-confirm
-            :md-active="$route.name === 'delete'"
-            md-title="Delete URL"
-            :md-content="'Are you sure you want to delete URL ' + $route.params.id + '?'"
-            md-confirm-text="Yes"
-            md-cancel-text="Cancel"
-            @md-confirm="delete_url($route.params.id)" 
-            @md-cancel="$router.push(dashboard_route)"
-            />
-    </div>
+            <template v-slot:item.last_modified="{item}">
+                <v-tooltip bottom>
+                    <template v-slot:activator="{on}">
+                        <span v-on="on">{{item.last_modified | pretty_from_now}}</span>
+                    </template>
+                    <span>{{item.last_modified | pretty}}</span>
+                </v-tooltip>
+            </template>
+
+            <template v-slot:item.actions="{item}">
+                <div style="white-space: nowrap">
+                    <v-tooltip bottom>
+                        <template v-slot:activator="{on}">
+                            <v-btn icon v-on="on"
+                                        v-clipboard="id_to_url(item.id)"
+                                        @success="$store.commit('ADD_FEEDBACK', 'URL copied to clipboard')">
+                                <v-icon>mdi-content-copy</v-icon>
+                            </v-btn>
+                        </template>
+                        <span>Copy to Clipboard</span>
+                    </v-tooltip>
+
+                    <v-tooltip bottom>
+                        <template v-slot:activator="{on}">
+                            <v-btn icon v-on="on" @click="edit_url(item.id)">
+                                <v-icon>mdi-pencil</v-icon>
+                            </v-btn>
+                        </template>
+                        <span>Edit</span>
+                    </v-tooltip>
+
+                    <v-tooltip bottom>
+                        <template v-slot:activator="{on}">
+                            <v-btn icon v-on="on" @click="delete_dialog_id = item.id">
+                                <v-icon>mdi-delete</v-icon>
+                            </v-btn>
+                        </template>
+                        <span>Delete</span>
+                    </v-tooltip>
+                </div>
+            </template>
+        </v-data-table>
+
+        <v-btn color="accent" fab fixed right bottom @click="edit_dialog = true">
+            <v-icon>mdi-plus</v-icon>
+        </v-btn>
+
+        <v-dialog :value="delete_dialog_id" persistent max-width="360px">
+            <v-card>
+                <v-card-title class="headline">Delete URL</v-card-title>
+                <v-card-text>Are you sure you to delete URL {{delete_dialog_id}}?</v-card-text>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn color="accent" text @click="delete_dialog_id = null">Cancel</v-btn>
+                    <v-btn color="primary" text @click="delete_url(delete_dialog_id)">Yes</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <app-edit :active.sync="edit_dialog" :id.sync="edit_dialog_id" @update="get_urls(admin_mode)"></app-edit>
+    </v-card>
 </template>
 
 <script>
-function processURLs(urls) {
-    for (var i = 0; i < urls.length; i++) {
-        urls[i]._expires = urls[i].expires
-        if (urls[i]._expires == null) {
-            urls[i]._expires = moment().add(10, "years").toISOString()
-        }
-    }
-}
-
 import moment from "moment"
-import {mapState, mapGetters} from "vuex"
+import {mapState, mapGetters, mapMutations, mapActions} from "vuex"
 import AuthorizedMixin from "./authorized-mixin.js"
-import store from "../js/store.js"
 import AppEdit from "./edit.vue"
+import api from "../js/api.js"
 export default {
     name: "app-dashboard",
     mixins: [AuthorizedMixin],
     components: {AppEdit},
     filters: {
+        url(id) {
+            return `${window.location.origin}/${id}`
+        },
         pretty(val) {
             return moment(val).format("LLLL")
         },
         pretty_from_now(val) {
-            if (val == null) { return "Never" }
+            if (val == null) {
+                return "Never"
+            }
             return moment(val).fromNow()
-        }
+        },
     },
     data() {
         return {
             search: "",
-            urls: [],
-            searched_urls: []
+            items: [],
+            delete_dialog_id: null,
+            edit_dialog: false,
+            edit_dialog_id: null,
         }
     },
     computed: {
-        window() {
-            return window
-        },
         ...mapState(["admin"]),
-        ...mapGetters(["is_loading", "admin_interface", "dashboard_route"]),
-        editActive() {
-            return this.$route.name === "create" || this.$route.name === "edit"
+        ...mapGetters(["is_loading"]),
+        _loading() {
+            return this.is_loading(api.get_urls)
         },
-        admin_interface_toggle: {
+        admin_mode: {
             get() {
-                return this.admin_interface
+                return this.$route.name === "admin"
             },
             set(val) {
-                this.$store.commit("UPDATE_ADMIN_STATE", val)
+                if (val) {
+                    this.$router.push({"name": "admin"})
+                } else {
+                    this.$router.push({"name": "dashboard"})
+                }
+            },
+        },
+        headers() {
+            if (this.admin_mode) {
+                return [
+                    {text: "ID", value: "id"},
+                    {text: "URL", value: "url"},
+                    {text: "Views", value: "views"},
+                    {text: "Expires", value: "expires"},
+                    {text: "Last Modified", value: "last_modified"},
+                    {text: "User", value: "user"},
+                    {text: "Actions", value: "actions", sortable: false, align: "end"},
+                ]
             }
-        }
+            return [
+                {text: "ID", value: "id"},
+                {text: "URL", value: "url"},
+                {text: "Views", value: "views"},
+                {text: "Expires", value: "expires"},
+                {text: "Last Modified", value: "last_modified"},
+                {text: "Actions", value: "actions", sortable: false, align: "end"},
+            ]
+        },
     },
     watch: {
-        $route(route) {
-            if (route.name === "admin" || route.name === "dashboard") {
-                this.reload()
-            }
-        }
+        "$route": function() {
+            this.get_urls(this.admin_mode)
+        },
     },
     methods: {
-        reload() {
-            var promise = store.dispatch("get_urls")
-            promise.then(response => {
-                var urls = response.data.urls
-                processURLs(urls)
-                this.urls = urls
-                this.search_urls(this.search)
-                this.$nextTick(() => { window.dispatchEvent(new Event("resize")) })
-            })
+        ...mapMutations(["ADD_FEEDBACK", "UPDATE_ERROR"]),
+        ...mapActions(["api_action"]),
+        id_to_url(id) {
+            return `${window.location.origin}/${id}`
         },
-        resort_urls() {
-            if (this.$refs.table != null) { this.$refs.table.mdSortFn(this.searched_urls) }
-        },
-        search_urls(search) {
-            if (search == null) {
-                this.searched_urls = this.urls
-                this.resort_urls()
-                return
+        async get_urls(admin_mode) {
+            try {
+                this.items = (await this.api_action({action: api.get_urls, params: [admin_mode]})).urls
+            } catch (err) {
+                if (err.response !== null && err.response.status === 404) {
+                    this.UPDATE_ERROR("Unable to load URLs. Contact your system administrator")
+                }
             }
-
-            search = search.toLowerCase()
-            this.searched_urls = this.urls.filter(elem => {
-                if (elem.id.toLowerCase().includes(search)) { return true }
-                if (elem.url.toLowerCase().includes(search)) { return true }
-                if (this.admin_interface && elem.user.toLowerCase().includes(search)) { return true }
-            })
-
-            this.resort_urls()
         },
-        delete_url(url_id) {
-            if (this.is_loading) { return }
-
-            var promise = this.$store.dispatch("delete_url", url_id)
-            promise.then(() => {
-                this.$router.push(this.dashboard_route)
-            }).catch(error => {
-                if (error.response != null &&  error.response.status === 403) {
-                    this.$router.replace(this.dashboard_route)
-                    return
+        edit_url(id) {
+            this.edit_dialog_id = id
+            this.edit_dialog = true
+        },
+        async delete_url(id) {
+            try {
+                await this.api_action({action: api.delete_url, params: [id]})
+                this.delete_dialog_id = null
+                this.get_urls(this.admin_mode)
+                this.ADD_FEEDBACK("URL deleted")
+            } catch (err) {
+                if (err.response !== null && err.response.status !== 401) {
+                    this.UPDATE_ERROR("Unable to delete URL. Contact your system administrator")
                 }
-                if (error.response != null &&  error.response.status === 404) {
-                    this.$router.push(this.dashboard_route)
-                    return
-                }
-            })
-        }
+            }
+        },
     },
     created() {
-        var promise = store.dispatch("get_urls")
-        promise.then(response => {
-            var urls = response.data.urls
-            processURLs(urls)
-            this.urls = urls
-            this.search_urls(this.search)
-        })
+        this.get_urls(this.admin_mode)
     },
-    beforeRouteEnter(to, from, next) {
-        if (to.name === "admin" && !store.state.admin) {
-            next({name: "dashboard"})
-            return
-        }
-
-        if (to.name === "admin") {
-            store.commit("UPDATE_ADMIN_STATE", true)
-        } else if (to.name === "dashboard") {
-            store.commit("UPDATE_ADMIN_STATE", false)
-        }
-
-        next()
-    }
 }
 </script>
-
-<style lang="stylus">
-#content #dashboard
-    max-width: 960px
-
-#content #dashboard.wide
-    max-width: 1280px
-
-.md-toolbar.toolbar
-    .md-title
-        flex: none
-
-    .spacer
-        flex: 1
-
-    .admin-toggle
-        flex: 1
-
-.search
-    max-width: 300px
-
-.md-table-cell.url-cell
-    max-width: 200px
-
-    .md-table-cell-container
-        overflow: hidden
-        text-overflow: ellipsis
+<style lang="sass">
+.url-item
+    display: block
+    width: 350px
+    white-space: nowrap
+    overflow: hidden
+    text-overflow: ellipsis
 </style>

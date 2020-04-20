@@ -1,82 +1,80 @@
 <template>
-    <form novalidate @submit.prevent="authenticate(username, password)">
-        <md-card>
-            <md-card-header>
-                <div class="md-title">Sign In</div>
-            </md-card-header>
+    <v-card width="100%" max-width="480px">
+        <v-card-title primary-title>
+            <div class="headline">Sign In</div>
+        </v-card-title>
 
-            <md-card-content>
+        <validation-observer ref="form" v-slot="{invalid}">
+            <form novalidate @submit.prevent="do_authenticate(username, password)">
+                <v-card-text>
+                    <validation-provider name="username" rules="required" v-slot="{errors}">
+                        <v-text-field
+                            label="Username"
+                            v-model="username"
+                            :error-messages="errors"
+                            required>
+                        </v-text-field>
+                    </validation-provider>
 
-                <md-field :class="{'md-invalid': errors.has('username')}">
-                    <label>Username</label>
-                    <md-input v-model="username" name="username" v-validate="'required'"></md-input>
-                    <span class="md-error">{{errors.first('username')}}</span>
-                </md-field>
+                    <validation-provider name="password" rules="required" v-slot="{errors}">
+                        <v-text-field
+                            :type="show_password ? 'text' : 'password'"
+                            :append-icon="show_password ? 'mdi-eye' : 'mdi-eye-off'"
+                            @click:append="show_password = !show_password"
+                            label="Password"
+                            v-model="password"
+                            :error-messages="errors"
+                            required>
+                        </v-text-field>
+                    </validation-provider>
 
-                <md-field :class="{'md-invalid': errors.has('password')}">
-                    <label>Password</label>
-                    <md-input type="password" v-model="password" name="password" v-validate="'required'"></md-input>
-                    <span class="md-error">{{errors.first('password')}}</span>
-                </md-field>
+                    <span class="error--text" v-if="error">{{error}}</span>
+                </v-card-text>
 
-                <span class="md-error" v-if="error">{{error}}</span>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn type="submit"
+                           color="primary"
+                           text
+                           :loading="_loading"
+                           :disabled="invalid || username === '' || password === ''">
+                           Sign In</v-btn>
+                </v-card-actions>
+            </form>
+        </validation-observer>
 
-            </md-card-content>
-
-            <md-card-actions>
-                <md-button type="submit" class="md-primary" :disabled="is_loading">
-                    <span v-show="!is_loading">Sign In</span>
-                    <md-progress-spinner
-                        class="app-spinner"
-                        v-if="is_loading"
-                        md-mode="indeterminate"
-                        :md-diameter="20"
-                        :md-stroke="2"
-                        ></md-progress-spinner>
-                </md-button>
-
-            </md-card-actions>
-        </md-card>
-    </form>
+    </v-card>
 </template>
 
 <script>
-import {mapState, mapGetters} from "vuex"
+import {mapState, mapGetters, mapActions} from "vuex"
+import api from "../js/api.js"
 import store from "../js/store.js"
 export default {
     name: "app-signin",
-    computed: {
-        ...mapState({"error": "last_error"}),
-        ...mapGetters(["is_loading"])
-    },
     data() {
         return {
-            username: null,
-            password: null
+            username: "",
+            password: "",
+            show_password: false,
         }
     },
+    computed: {
+        ...mapState({"error": "last_error"}),
+        ...mapGetters(["is_loading"]),
+        _loading() {
+            return this.is_loading([api.authenticate])
+        },
+    },
     methods: {
-        authenticate(username, password) {
-            if (this.is_loading) { return }
+        ...mapActions(["authenticate"]),
+        async do_authenticate(username, password) {
+            if (this._loading || !(await this.$refs.form.validate())) {
+                return
+            }
 
-            this.$validator.validateAll().catch(() => {
-                this.$store.commit("UPDATE_ERROR", "Form validation error")
-            }).then(valid => {
-                if (valid) {
-                    return this.$store.dispatch("authenticate", {username, password})
-                }
-                return Promise.reject()
-            }).then(() => {
-                var next = this.$store.getters.next_route
-                if (next == null) {
-                    next = {name: "dashboard"}
-                }
-                this.$router.push(next)
-                this.$store.commit("UPDATE_NEXT_ROUTE", null)
-            }).catch(() => {
-                // ignore errors
-            })
-        }
+            this.authenticate({username, password})
+        },
     },
     beforeRouteEnter(to, from, next) {
         if (store.getters.signed_in) {
@@ -84,6 +82,6 @@ export default {
             return
         }
         next()
-    }
+    },
 }
 </script>

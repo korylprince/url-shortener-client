@@ -1,95 +1,94 @@
 <template>
-    <div id="root" class="page-container">
-        <md-app>
-            <md-app-toolbar class="md-primary md-dense">
-                <router-link class="md-title" :to="dashboard_route">{{title}}</router-link>
+    <v-app>
+        <v-app-bar color="primary" dark dense app>
+            <v-toolbar-title>{{title}}</v-toolbar-title>
 
-                <span v-show="username">{{username}}</span>
+            <v-spacer></v-spacer>
 
-                <div v-show="signed_in">
-                    <md-menu md-direction="bottom-start">
-                        <md-button class="md-icon-button" md-menu-trigger>
-                            <md-icon>more_vert</md-icon>
-                        </md-button>
+            <v-tooltip bottom v-if="display_name">
+                <template v-slot:activator="{on}">
+                    <span v-on="on">{{display_name}}</span>
+                </template>
+                <span>{{username}}</span>
+            </v-tooltip>
 
-                        <md-menu-content>
-                            <md-menu-item @click="signout">Sign Out</md-menu-item>
-                        </md-menu-content>
-                    </md-menu>
-                </div>
-            </md-app-toolbar>
+           <v-menu offset-y v-show="signed_in">
+                <template v-slot:activator="{on}">
+                    <v-btn icon v-on="on" v-show="signed_in"><v-icon>mdi-dots-vertical</v-icon></v-btn>
+                </template>
+                <v-list>
+                    <v-list-item @click="signout">
+                        <v-list-item-title>Sign Out</v-list-item-title>
+                    </v-list-item>
+                </v-list>
+            </v-menu>
+        </v-app-bar>
 
-            <md-app-content id="content">
-                <router-view></router-view>
-                <md-button class="md-fab md-fab-bottom-right md-accent" @click="$router.push({name: 'create'})" v-show="signed_in">
-                    <md-icon>add</md-icon>
-                    <md-tooltip md-direction="top">Add URL</md-tooltip>
-                </md-button>
-            </md-app-content>
+        <v-content style="background-color: #fafafa">
+            <v-container fluid :pa-0="$vuetify.breakpoint.xsOnly">
+                <v-layout justify-center>
+                    <router-view></router-view>
+                </v-layout>
+            </v-container>
+        </v-content>
 
-        </md-app>
+        <v-dialog :value="show_dialog" persistent max-width="480" :fullscreen="$vuetify.breakpoint.xsOnly">
+            <v-card>
+                <v-card-title class="headline">Error</v-card-title>
+                <v-card-text>{{error}}</v-card-text>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn color="primary" text @click="UPDATE_ERROR(null)">OK</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
 
-        <md-dialog-alert
-            id="dialog-alert"
-            :md-active="show_dialog"
-            @update:mdActive="$store.commit('UPDATE_ERROR', null)"
-            md-title="Error"
-            :md-content="error"
-            :md-click-outside-to-close="false"
-            ></md-dialog-alert>
-
-        <md-snackbar
-            :md-active="current_feedback != null"
-            @update:mdActive="$store.dispatch('clear_feedback')"
-            md-persistent
-            >
-            <span>{{current_feedback}}</span>
-        </md-snackbar>
-    </div>
+        <v-snackbar :value="current_feedback != null" @input="clear_feedback">
+            {{ current_feedback }}
+            <v-btn color="secondary"
+                text
+                @click="clear_feedback">
+                Close
+            </v-btn>
+        </v-snackbar>
+    </v-app>
 </template>
 
 <script>
-import {mapState, mapGetters} from "vuex"
+import {mapState, mapMutations, mapGetters, mapActions} from "vuex"
+import api from "../js/api.js"
 export default {
-    name: "my-app",
+    name: "app-main",
     computed: {
-        ...mapState(["username", "title"]),
+        ...mapState(["username", "display_name", "title"]),
         ...mapState({"error": "last_error"}),
-        ...mapGetters(["signed_in", "current_feedback", "dashboard_route"]),
+        ...mapGetters(["signed_in", "current_feedback"]),
         ...mapGetters({"show_dialog_state": "show_dialog"}),
         show_dialog() {
             return this.$route.name !== "signin" && this.show_dialog_state
-        }
+        },
     },
     methods: {
-        signout() {
-            return this.$store.dispatch("signout").then(() => {
-                this.$router.push({name: "signin"})
-            })
+        ...mapMutations(["UPDATE_TITLE", "UPDATE_ERROR"]),
+        ...mapActions(["clear_feedback", "signout", "api_action"]),
+    },
+    async created() {
+        try {
+            const title = (await this.api_action({action: api.get_title, params: []})).app_title
+            this.UPDATE_TITLE(title)
+        } catch (err) {
+            console.error("Unable to update title:", err)
         }
-    }
+    },
 }
 </script>
 
-<style lang="stylus">
-#root, &>.md-app
-    min-height: 100vh
-
-#dialog-alert
-    z-index: 999
-
-.md-toolbar .md-title
-    flex: 1
+<style lang="sass" scoped>
+.toolbar-title
+    color: inherit
+    cursor: pointer
+    text-decoration: none
 
     &:hover
-        text-decoration: none
-        font-weight: 500
-
-#content
-    background-color: #eee
-
-    > div, form
-        max-width: 600px
-        margin-left: auto
-        margin-right: auto
+        font-weight: bold
 </style>

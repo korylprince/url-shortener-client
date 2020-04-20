@@ -1,15 +1,29 @@
 <template>
-    <md-empty-state
-        class="md-accent"
-        md-icon="error_outline"
-        md-label="404 Not Found"
-        md-description="This URL doesn't exist. It may have been deleted or expired."
-        >
-    </md-empty-state>
+    <v-app>
+        <v-content>
+            <v-container fluid>
+                <v-row justify="center" align="center" align-content="center" style="text-align: center">
+                    <v-col align-self="center" cols="4">
+                        <v-icon :size="200">mdi-help-circle</v-icon>
+                        <div class="display-1">{{code}}</div>
+                        <div class="body-1">{{text}}</div>
+                    </v-col>
+                </v-row>
+            </v-container>
+        </v-content>
+    </v-app>
 </template>
 
 <script>
 export default {
-    name: "app-not-found",
+    name: "not-found",
+    computed: {
+        code() {
+            return (new URL(window.location.href)).searchParams.get("statusCode")
+        },
+        text() {
+            return (new URL(window.location.href)).searchParams.get("statusText")
+        },
+    },
 }
 </script>

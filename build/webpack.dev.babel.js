@@ -1,14 +1,47 @@
+import webpack from "webpack"
 import merge from "webpack-merge"
+import fibers from "fibers"
 
-import baseConfig from "./webpack.base.babel.js"
+import {baseConfig, postcssLoader} from "./webpack.base.babel.js"
 
-var devConfig = {
+const devConfig = {
     mode: "development",
-    stats: {children: false},
     devServer: {
-        stats: "minimal"
+        hot: true,
+        stats: "minimal",
+        proxy: {
+            "/api": {
+                target: process.env.API_SERVER,
+                secure: false,
+                changeOrigin: true,
+            },
+        },
     },
-    devtool: "#cheap-module-inline-source-map"
+    devtool: "inline-source-map",
+    module: {
+        rules: [
+            {
+                test: /\.css$/,
+                use: [
+                    {loader: "style-loader"},
+                    {loader: "css-loader", options: {importLoaders: 1, sourceMap: true}},
+                    postcssLoader,
+                ],
+            },
+            {
+                test: /\.s[ac]ss$/,
+                use: [
+                    {loader: "style-loader"},
+                    {loader: "css-loader", options: {importLoaders: 2, sourceMap: true}},
+                    postcssLoader,
+                    {loader: "sass-loader", options: {sourceMap: true, sassOptions: {indentedSyntax: true, fibers}}},
+                ],
+            },
+        ],
+    },
+    plugins: [
+        new webpack.HotModuleReplacementPlugin(),
+    ],
 }
 
 export default merge(baseConfig, devConfig)
