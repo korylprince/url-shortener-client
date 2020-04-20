@@ -1,6 +1,6 @@
 {
   "name": "url-shortener-client",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Authenticated URL Shortener",
   "main": "dist/app.js",
   "scripts": {
