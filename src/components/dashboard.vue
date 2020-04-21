@@ -161,10 +161,10 @@ export default {
         },
         admin_mode: {
             get() {
-                return this.$route.name === "admin"
+                return this.admin && this.$route.name === "admin"
             },
             set(val) {
-                if (val) {
+                if (val && this.admin) {
                     this.$router.push({"name": "admin"})
                 } else {
                     this.$router.push({"name": "dashboard"})
